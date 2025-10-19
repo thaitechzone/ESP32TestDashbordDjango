@@ -52,7 +52,7 @@ const char* RELAY3_STATE_TOPIC = "thaitechzone/v2_board/state/relay3";
 // Topics for sensor data
 const char* TEMPERATURE_TOPIC = "thaitechzone/v2_board/sensor/temperature";
 const char* HUMIDITY_TOPIC = "thaitechzone/v2_board/sensor/humidity";
-const char* SENSOR_DATA_TOPIC = "thaitechzone/v2_board/sensors/data";
+const char* SENSOR_DATA_TOPIC = "thaitechzone/v2_board/sensor/data";
 
 // ===== Global Objects =====
 WiFiClient espClient;
