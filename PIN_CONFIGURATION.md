@@ -135,7 +135,7 @@ IN3           -> GPIO 4  (Relay 3)
 ### Sensor Data:
 - Temperature: `thaitechzone/v2_board/sensor/temperature`
 - Humidity: `thaitechzone/v2_board/sensor/humidity`
-- JSON Data: `thaitechzone/v2_board/sensors/data`
+- JSON Data: `thaitechzone/v2_board/sensor/data`
 
 ---
 
