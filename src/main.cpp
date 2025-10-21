@@ -38,21 +38,21 @@ const char* MQTT_CLIENT_ID = "ESP_ThaiTechZone_LED_Controller_01"; // A unique n
 
 // --- MQTT Topics (Matching the Django Dashboard) ---
 // Topic this ESP32 LISTENS to for commands
-const char* LED_CONTROL_TOPIC = "thaitechzone/v2_board/control/led";
+const char* LED_CONTROL_TOPIC = "thaitechzone/v2_board1/control/led";
 // Topic this ESP32 PUBLISHES its status to
-const char* LED_STATE_TOPIC = "thaitechzone/v2_board/state/led";
+const char* LED_STATE_TOPIC = "thaitechzone/v2_board1/state/led";
 // Relay control topics
-const char* RELAY1_CONTROL_TOPIC = "thaitechzone/v2_board/control/relay1";
-const char* RELAY2_CONTROL_TOPIC = "thaitechzone/v2_board/control/relay2";
-const char* RELAY3_CONTROL_TOPIC = "thaitechzone/v2_board/control/relay3";
+const char* RELAY1_CONTROL_TOPIC = "thaitechzone/v2_board1/control/relay1";
+const char* RELAY2_CONTROL_TOPIC = "thaitechzone/v2_board1/control/relay2";
+const char* RELAY3_CONTROL_TOPIC = "thaitechzone/v2_board1/control/relay3";
 // Relay state topics
-const char* RELAY1_STATE_TOPIC = "thaitechzone/v2_board/state/relay1";
-const char* RELAY2_STATE_TOPIC = "thaitechzone/v2_board/state/relay2";
-const char* RELAY3_STATE_TOPIC = "thaitechzone/v2_board/state/relay3";
+const char* RELAY1_STATE_TOPIC = "thaitechzone/v2_board1/state/relay1";
+const char* RELAY2_STATE_TOPIC = "thaitechzone/v2_board1/state/relay2";
+const char* RELAY3_STATE_TOPIC = "thaitechzone/v2_board1/state/relay3";
 // Topics for sensor data
-const char* TEMPERATURE_TOPIC = "thaitechzone/v2_board/sensor/temperature";
-const char* HUMIDITY_TOPIC = "thaitechzone/v2_board/sensor/humidity";
-const char* SENSOR_DATA_TOPIC = "thaitechzone/v2_board/sensor/data";
+const char* TEMPERATURE_TOPIC = "thaitechzone/v2_board1/sensor/temperature";
+const char* HUMIDITY_TOPIC = "thaitechzone/v2_board1/sensor/humidity";
+const char* SENSOR_DATA_TOPIC = "thaitechzone/v2_board1/sensor/data";
 
 // ===== Global Objects =====
 WiFiClient espClient;
