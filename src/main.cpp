@@ -20,6 +20,10 @@
 #define SW2_PIN 35 // Button 2 for Relay 2 (with External Pull-up)
 #define SW3_PIN 32 // Button 3 for Relay 3 (INPUT_PULLUP)
 
+// Isolated Input pins
+#define ISOLATE_IN1 33 // Isolated Input 1 (with External Pull-up, Active LOW)
+#define ISOLATE_IN2 27 // Isolated Input 2 (with External Pull-up, Active LOW)
+
 // OLED Display settings
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -55,6 +59,9 @@ const char* RELAY3_STATE_TOPIC = "thaitechzone/v2_board1/state/relay3";
 const char* TEMPERATURE_TOPIC = "thaitechzone/v2_board1/sensor/temperature";
 const char* HUMIDITY_TOPIC = "thaitechzone/v2_board1/sensor/humidity";
 const char* SENSOR_DATA_TOPIC = "thaitechzone/v2_board1/sensor/data";
+// Topics for isolated inputs
+const char* ISOLATE_IN1_STATE_TOPIC = "thaitechzone/v2_board1/state/isolate_in1";
+const char* ISOLATE_IN2_STATE_TOPIC = "thaitechzone/v2_board1/state/isolate_in2";
 
 // ===== Global Objects =====
 WiFiClient espClient;
@@ -84,6 +91,12 @@ unsigned long lastDebounceTime2 = 0;
 unsigned long lastDebounceTime3 = 0;
 const unsigned long debounceDelay = 50;
 
+// Isolated Input states
+bool lastIsolateIn1State = HIGH;
+bool lastIsolateIn2State = HIGH;
+unsigned long lastIsolateIn1DebounceTime = 0;
+unsigned long lastIsolateIn2DebounceTime = 0;
+
 // ===== Function Declarations =====
 void setup_wifi();
 void callback(char* topic, byte* payload, unsigned int length);
@@ -95,6 +108,8 @@ void publishSensorDataJSON(float temperature, float humidity);
 void updateDisplay();
 void checkButtons();
 void toggleRelay(int relayNum);
+void checkIsolatedInputs();
+void publishIsolatedInputState(int inputNum);
 
 void setup() {
   // Initialize Serial Monitor
@@ -122,6 +137,12 @@ void setup() {
   pinMode(SW2_PIN, INPUT_PULLUP);
   pinMode(SW3_PIN, INPUT_PULLUP);
   Serial.println("Buttons SW1, SW2, SW3 initialized");
+  
+  // Configure Isolated Input pins with pull-up resistors
+  // Note: GPIO 33, 27 use external pull-up resistors (10kΩ to 3.3V)
+  pinMode(ISOLATE_IN1, INPUT_PULLUP);
+  pinMode(ISOLATE_IN2, INPUT_PULLUP);
+  Serial.println("Isolated Inputs IN1, IN2 initialized");
   
   // Initialize OLED Display
   if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
@@ -169,6 +190,9 @@ void loop() {
     
     // Check button states
     checkButtons();
+    
+    // Check isolated input states
+    checkIsolatedInputs();
     
     // Read and publish sensor data periodically
     unsigned long now = millis();
@@ -377,6 +401,8 @@ void reconnectMQTT() {
     publishRelayState(1);
     publishRelayState(2);
     publishRelayState(3);
+    publishIsolatedInputState(1);
+    publishIsolatedInputState(2);
     
   } else {
     Serial.print(" failed, rc=");
@@ -508,10 +534,18 @@ void updateDisplay() {
   display.print(currentHumidity, 1);
   display.println(F("%"));
   
-  // LED Status
+  // LED Status and Isolated Inputs
   display.setCursor(0, 56);
-  display.print(F("LED: "));
-  display.println(digitalRead(LED_PIN) ? F("ON") : F("OFF"));
+  display.print(F("LED:"));
+  display.print(digitalRead(LED_PIN) ? F("ON ") : F("OFF"));
+  
+  display.print(F(" I1:"));
+  bool in1Active = (digitalRead(ISOLATE_IN1) == LOW); // Active LOW
+  display.print(in1Active ? F("ON ") : F("OFF"));
+  
+  display.print(F(" I2:"));
+  bool in2Active = (digitalRead(ISOLATE_IN2) == LOW); // Active LOW
+  display.print(in2Active ? F("ON") : F("OFF"));
   
   display.display();
 }
@@ -591,4 +625,71 @@ void toggleRelay(int relayNum) {
   
   // Update display immediately
   updateDisplay();
+}
+
+void checkIsolatedInputs() {
+  unsigned long currentTime = millis();
+  
+  // Check ISOLATE_IN1
+  bool in1Reading = digitalRead(ISOLATE_IN1);
+  if (in1Reading != lastIsolateIn1State) {
+    lastIsolateIn1DebounceTime = currentTime;
+  }
+  if ((currentTime - lastIsolateIn1DebounceTime) > debounceDelay) {
+    if (in1Reading != lastIsolateIn1State) {
+      lastIsolateIn1State = in1Reading;
+      Serial.print("Isolated Input 1 state changed: ");
+      Serial.println(in1Reading == LOW ? "ACTIVE (ON)" : "INACTIVE (OFF)");
+      publishIsolatedInputState(1);
+    }
+  }
+  
+  // Check ISOLATE_IN2
+  bool in2Reading = digitalRead(ISOLATE_IN2);
+  if (in2Reading != lastIsolateIn2State) {
+    lastIsolateIn2DebounceTime = currentTime;
+  }
+  if ((currentTime - lastIsolateIn2DebounceTime) > debounceDelay) {
+    if (in2Reading != lastIsolateIn2State) {
+      lastIsolateIn2State = in2Reading;
+      Serial.print("Isolated Input 2 state changed: ");
+      Serial.println(in2Reading == LOW ? "ACTIVE (ON)" : "INACTIVE (OFF)");
+      publishIsolatedInputState(2);
+    }
+  }
+}
+
+void publishIsolatedInputState(int inputNum) {
+  bool inputState;
+  const char* stateTopic;
+  
+  // Get input state and topic based on input number
+  switch(inputNum) {
+    case 1:
+      inputState = digitalRead(ISOLATE_IN1);
+      stateTopic = ISOLATE_IN1_STATE_TOPIC;
+      break;
+    case 2:
+      inputState = digitalRead(ISOLATE_IN2);
+      stateTopic = ISOLATE_IN2_STATE_TOPIC;
+      break;
+    default:
+      Serial.println("Invalid isolated input number");
+      return;
+  }
+  
+  // Active LOW: LOW = ON, HIGH = OFF
+  String stateMessage = inputState == LOW ? "ON" : "OFF";
+  
+  // Publish with retain flag
+  if (mqttClient.publish(stateTopic, stateMessage.c_str(), true)) {
+    Serial.print("Isolated Input ");
+    Serial.print(inputNum);
+    Serial.print(" state published: ");
+    Serial.println(stateMessage);
+  } else {
+    Serial.print("Failed to publish Isolated Input ");
+    Serial.print(inputNum);
+    Serial.println(" state");
+  }
 }
