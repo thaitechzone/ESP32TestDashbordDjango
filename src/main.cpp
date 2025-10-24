@@ -72,8 +72,10 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 long last_reconnect_attempt = 0;
 unsigned long lastSensorRead = 0;
 unsigned long lastDisplayUpdate = 0;
+unsigned long lastIsolatedInputPublish = 0;
 const unsigned long SENSOR_INTERVAL = 5000; // Send sensor data every 5 seconds
 const unsigned long DISPLAY_UPDATE_INTERVAL = 500; // Update display every 500ms
+const unsigned long ISOLATED_INPUT_PUBLISH_INTERVAL = 2000; // Publish isolated input states every 2 seconds
 
 // Store current sensor values for display
 float currentTemperature = 0.0;
@@ -199,6 +201,13 @@ void loop() {
     if (now - lastSensorRead >= SENSOR_INTERVAL) {
       lastSensorRead = now;
       readAndPublishSensorData();
+    }
+    
+    // Publish isolated input states periodically
+    if (now - lastIsolatedInputPublish >= ISOLATED_INPUT_PUBLISH_INTERVAL) {
+      lastIsolatedInputPublish = now;
+      publishIsolatedInputState(1);
+      publishIsolatedInputState(2);
     }
     
     // Update OLED display periodically
