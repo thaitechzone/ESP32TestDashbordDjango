@@ -44,8 +44,8 @@ const int MQTT_PORT = 1883;
 // --- Device Identity (Custom UUID - SET THIS BEFORE FLASHING EACH BOARD) ---
 // !! CHANGE THIS VALUE FOR EVERY BOARD !!
 // Naming convention: <project>_<location>_<number>
-// Examples: "tti_factory_001", "tti_office_002", "tti_warehouse_003"
-#define DEVICE_NAME "tti_board_001"
+// Examples: "ttz_factory_001", "ttz_office_002", "ttz_warehouse_003"
+#define DEVICE_NAME "ttz_board_001"
 
 String DEVICE_ID;        // Set from DEVICE_NAME at runtime
 String MQTT_CLIENT_ID;   // e.g. "ThaiTechZone_tti_board_001"

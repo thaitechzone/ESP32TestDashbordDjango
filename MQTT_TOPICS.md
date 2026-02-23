@@ -10,15 +10,15 @@
 
 | Key | Value |
 |-----|-------|
-| `DEVICE_NAME` (define) | `tti_board_001` |
-| `DEVICE_ID` (runtime) | `tti_board_001` |
-| `MQTT_CLIENT_ID` | `ThaiTechZone_tti_board_001` |
+| `DEVICE_NAME` (define) | `ttz_board_001` |
+| `DEVICE_ID` (runtime) | `ttz_board_001` |
+| `MQTT_CLIENT_ID` | `ThaiTechZone_ttz_board_001` |
 
 > **หากมีหลายบอร์ด** ให้เปลี่ยน `#define DEVICE_NAME` ใน `src/main.cpp` ก่อน flash
 > ```
-> tti_board_001  →  Board 1
-> tti_board_002  →  Board 2
-> tti_board_003  →  Board 3
+> ttz_board_001  →  Board 1
+> ttz_board_002  →  Board 2
+> ttz_board_003  →  Board 3
 > ```
 
 ---
@@ -31,14 +31,14 @@ thaitechzone/v2/<DEVICE_ID>/<direction>/<property>
 
 ---
 
-## Topics ทั้งหมด (ตัวอย่าง: DEVICE_NAME = "tti_board_001")
+## Topics ทั้งหมด (ตัวอย่าง: DEVICE_NAME = "ttz_board_001")
 
 ### LED
 
 | Topic | Direction | Payload | หมายเหตุ |
 |-------|-----------|---------|----------|
-| `thaitechzone/v2/tti_board_001/control/led` | **SUBSCRIBE** (ESP รับคำสั่ง) | `ON` / `OFF` | Django → ESP32 |
-| `thaitechzone/v2/tti_board_001/state/led` | **PUBLISH** (ESP ส่งสถานะ) | `ON` / `OFF` | ESP32 → Django (retain=true) |
+| `thaitechzone/v2/ttz_board_001/control/led` | **SUBSCRIBE** (ESP รับคำสั่ง) | `ON` / `OFF` | Django → ESP32 |
+| `thaitechzone/v2/ttz_board_001/state/led` | **PUBLISH** (ESP ส่งสถานะ) | `ON` / `OFF` | ESP32 → Django (retain=true) |
 
 ---
 
@@ -46,12 +46,12 @@ thaitechzone/v2/<DEVICE_ID>/<direction>/<property>
 
 | Topic | Direction | Payload | หมายเหตุ |
 |-------|-----------|---------|----------|
-| `thaitechzone/v2/tti_board_001/control/relay1` | **SUBSCRIBE** | `ON` / `OFF` | Django → ESP32 |
-| `thaitechzone/v2/tti_board_001/control/relay2` | **SUBSCRIBE** | `ON` / `OFF` | Django → ESP32 |
-| `thaitechzone/v2/tti_board_001/control/relay3` | **SUBSCRIBE** | `ON` / `OFF` | Django → ESP32 |
-| `thaitechzone/v2/tti_board_001/state/relay1` | **PUBLISH** | `ON` / `OFF` | ESP32 → Django (retain=true) |
-| `thaitechzone/v2/tti_board_001/state/relay2` | **PUBLISH** | `ON` / `OFF` | ESP32 → Django (retain=true) |
-| `thaitechzone/v2/tti_board_001/state/relay3` | **PUBLISH** | `ON` / `OFF` | ESP32 → Django (retain=true) |
+| `thaitechzone/v2/ttz_board_001/control/relay1` | **SUBSCRIBE** | `ON` / `OFF` | Django → ESP32 |
+| `thaitechzone/v2/ttz_board_001/control/relay2` | **SUBSCRIBE** | `ON` / `OFF` | Django → ESP32 |
+| `thaitechzone/v2/ttz_board_001/control/relay3` | **SUBSCRIBE** | `ON` / `OFF` | Django → ESP32 |
+| `thaitechzone/v2/ttz_board_001/state/relay1` | **PUBLISH** | `ON` / `OFF` | ESP32 → Django (retain=true) |
+| `thaitechzone/v2/ttz_board_001/state/relay2` | **PUBLISH** | `ON` / `OFF` | ESP32 → Django (retain=true) |
+| `thaitechzone/v2/ttz_board_001/state/relay3` | **PUBLISH** | `ON` / `OFF` | ESP32 → Django (retain=true) |
 
 > **Active Low:** Relay จริงบน PCB คือ LOW = ON, HIGH = OFF  
 > แต่ Payload ที่ ESP32 ส่ง/รับ คือ `"ON"`/`"OFF"` ตรงตัว (firmware แปลงให้แล้ว)
@@ -62,9 +62,9 @@ thaitechzone/v2/<DEVICE_ID>/<direction>/<property>
 
 | Topic | Direction | Payload | หมายเหตุ |
 |-------|-----------|---------|----------|
-| `thaitechzone/v2/tti_board_001/sensor/temperature` | **PUBLISH** | `"27.5"` (string, °C) | ทศนิยม 1 ตำแหน่ง |
-| `thaitechzone/v2/tti_board_001/sensor/humidity` | **PUBLISH** | `"65.3"` (string, %) | ทศนิยม 1 ตำแหน่ง |
-| `thaitechzone/v2/tti_board_001/sensor/data` | **PUBLISH** | JSON (ดูด้านล่าง) | ส่งทุก 5 วินาที |
+| `thaitechzone/v2/ttz_board_001/sensor/temperature` | **PUBLISH** | `"27.5"` (string, °C) | ทศนิยม 1 ตำแหน่ง |
+| `thaitechzone/v2/ttz_board_001/sensor/humidity` | **PUBLISH** | `"65.3"` (string, %) | ทศนิยม 1 ตำแหน่ง |
+| `thaitechzone/v2/ttz_board_001/sensor/data` | **PUBLISH** | JSON (ดูด้านล่าง) | ส่งทุก 5 วินาที |
 
 #### JSON Payload — `sensor/data`
 ```json
@@ -81,8 +81,8 @@ thaitechzone/v2/<DEVICE_ID>/<direction>/<property>
 
 | Topic | Direction | Payload | หมายเหตุ |
 |-------|-----------|---------|----------|
-| `thaitechzone/v2/tti_board_001/state/isolate_in1` | **PUBLISH** | `ON` / `OFF` | ESP32 → Django (retain=true) |
-| `thaitechzone/v2/tti_board_001/state/isolate_in2` | **PUBLISH** | `ON` / `OFF` | ESP32 → Django (retain=true) |
+| `thaitechzone/v2/ttz_board_001/state/isolate_in1` | **PUBLISH** | `ON` / `OFF` | ESP32 → Django (retain=true) |
+| `thaitechzone/v2/ttz_board_001/state/isolate_in2` | **PUBLISH** | `ON` / `OFF` | ESP32 → Django (retain=true) |
 
 > **Active LOW:** สัญญาณ LOW บน GPIO = `"ON"`, HIGH = `"OFF"`  
 > ส่งทันทีเมื่อ state เปลี่ยน + ส่งซ้ำทุก 2 วินาที (periodic publish)
@@ -115,7 +115,7 @@ thaitechzone/v2/+/state/isolate_in1
 thaitechzone/v2/+/state/isolate_in2
 
 # ดูทุกอย่างจากบอร์ดเดียว (debug)
-thaitechzone/v2/tti_board_001/#
+thaitechzone/v2/ttz_board_001/#
 
 # ดูทุกอย่างจากทุกบอร์ด (debug)
 thaitechzone/v2/#
@@ -127,6 +127,6 @@ thaitechzone/v2/#
 
 | Board | DEVICE_NAME | Base Topic |
 |-------|-------------|-----------|
-| Board 1 | `tti_board_001` | `thaitechzone/v2/tti_board_001/` |
-| Board 2 | `tti_board_002` | `thaitechzone/v2/tti_board_002/` |
-| Board 3 | `tti_board_003` | `thaitechzone/v2/tti_board_003/` |
+| Board 1 | `ttz_board_001` | `thaitechzone/v2/ttz_board_001/` |
+| Board 2 | `ttz_board_002` | `thaitechzone/v2/ttz_board_002/` |
+| Board 3 | `ttz_board_003` | `thaitechzone/v2/ttz_board_003/` |
