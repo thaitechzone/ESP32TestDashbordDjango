@@ -90,6 +90,10 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 OneWire oneWire(DS18B20_PIN);
 DallasTemperature ds18b20(&oneWire);
 
+// XY-MD03 Temp/Humidity Sensor (Modbus RTU via Serial0 / UART0)
+// NOTE: Serial baud rate must be 9600 to match XY-MD03 default (9600 8N1)
+DevTempHumidity xyMD03(&Serial, 1); // Slave ID = 1 (default)
+
 long last_reconnect_attempt = 0;
 unsigned long lastSensorRead = 0;
 unsigned long lastDS18B20Read = 0;
@@ -140,7 +144,8 @@ void publishIsolatedInputState(int inputNum);
 
 void setup() {
   // Initialize Serial Monitor
-  Serial.begin(115200);
+  // NOTE: 9600 baud required — XY-MD03 Modbus RTU shares Serial0 (UART0) at 9600
+  Serial.begin(9600);
   Serial.println("\n=== ESP32 MQTT LED Controller Starting ===");
 
   // --- Set Device ID from custom DEVICE_NAME define ---
@@ -218,6 +223,10 @@ void setup() {
   // Initialize DHT sensor
   dht.begin();
   Serial.println("DHT sensor initialized");
+
+  // Initialize XY-MD03 Temp/Humidity Sensor (Modbus RTU on Serial0)
+  xyMD03.begin(9600);
+  Serial.println("XY-MD03 sensor initialized (Modbus RTU, Slave ID=1, 9600 baud)");
 
   // Initialize DS18B20 sensor
   ds18b20.begin();
@@ -485,19 +494,25 @@ void reconnectMQTT() {
 }
 
 void readAndPublishSensorData() {
-  // Random values (placeholder — replace with real sensor when ready)
-  float temperature = random(200, 350) / 10.0; // Random temp between 20.0-35.0°C
-  float humidity = random(400, 800) / 10.0;    // Random humidity between 40.0-80.0%
+  // Read real values from XY-MD03 Temp/Humidity Sensor (Modbus RTU)
+  bool readOK = xyMD03.update();
+
+  float temperature = readOK ? xyMD03.getTemperature() : 0.0;
+  float humidity    = readOK ? xyMD03.getHumidity()    : 0.0;
+
+  if (readOK) {
+    Serial.print("[XY-MD03] Temperature: ");
+    Serial.print(temperature, 1);
+    Serial.print(" °C, Humidity: ");
+    Serial.print(humidity, 1);
+    Serial.println(" %");
+  } else {
+    Serial.println("[XY-MD03] Read failed — publishing 0.0");
+  }
 
   // Store values for display
   currentTemperature = temperature;
   currentHumidity = humidity;
-
-  Serial.print("Temperature: ");
-  Serial.print(temperature, 1);
-  Serial.print("°C, Humidity: ");
-  Serial.print(humidity, 1);
-  Serial.println("%");
 
   // Publish individual topics
   String tempStr = String(temperature, 1);
