@@ -40,28 +40,32 @@ const char* WIFI_PASSWORD = "0939391546";
 // ===== MQTT Configuration =====
 const char* MQTT_BROKER = "broker.hivemq.com";
 const int MQTT_PORT = 1883;
-const char* MQTT_CLIENT_ID = "ESP_ThaiTechZone_LED_Controller_01"; // A unique name
 
-// --- MQTT Topics (Matching the Django Dashboard) ---
-// Topic this ESP32 LISTENS to for commands
-const char* LED_CONTROL_TOPIC = "thaitechzone/v2_board1/control/led";
-// Topic this ESP32 PUBLISHES its status to
-const char* LED_STATE_TOPIC = "thaitechzone/v2_board1/state/led";
-// Relay control topics
-const char* RELAY1_CONTROL_TOPIC = "thaitechzone/v2_board1/control/relay1";
-const char* RELAY2_CONTROL_TOPIC = "thaitechzone/v2_board1/control/relay2";
-const char* RELAY3_CONTROL_TOPIC = "thaitechzone/v2_board1/control/relay3";
-// Relay state topics
-const char* RELAY1_STATE_TOPIC = "thaitechzone/v2_board1/state/relay1";
-const char* RELAY2_STATE_TOPIC = "thaitechzone/v2_board1/state/relay2";
-const char* RELAY3_STATE_TOPIC = "thaitechzone/v2_board1/state/relay3";
-// Topics for sensor data
-const char* TEMPERATURE_TOPIC = "thaitechzone/v2_board1/sensor/temperature";
-const char* HUMIDITY_TOPIC = "thaitechzone/v2_board1/sensor/humidity";
-const char* SENSOR_DATA_TOPIC = "thaitechzone/v2_board1/sensor/data";
-// Topics for isolated inputs
-const char* ISOLATE_IN1_STATE_TOPIC = "thaitechzone/v2_board1/state/isolate_in1";
-const char* ISOLATE_IN2_STATE_TOPIC = "thaitechzone/v2_board1/state/isolate_in2";
+// --- Device Identity (Custom UUID - SET THIS BEFORE FLASHING EACH BOARD) ---
+// !! CHANGE THIS VALUE FOR EVERY BOARD !!
+// Naming convention: <project>_<location>_<number>
+// Examples: "tti_factory_001", "tti_office_002", "tti_warehouse_003"
+#define DEVICE_NAME "tti_board_001"
+
+String DEVICE_ID;        // Set from DEVICE_NAME at runtime
+String MQTT_CLIENT_ID;   // e.g. "ThaiTechZone_tti_board_001"
+
+// --- MQTT Topics (Dynamically built from DEVICE_ID) ---
+// Pattern: thaitechzone/v2/<device_id>/<direction>/<property>
+// This ensures NO topic collision between multiple boards
+String LED_CONTROL_TOPIC;
+String LED_STATE_TOPIC;
+String RELAY1_CONTROL_TOPIC;
+String RELAY2_CONTROL_TOPIC;
+String RELAY3_CONTROL_TOPIC;
+String RELAY1_STATE_TOPIC;
+String RELAY2_STATE_TOPIC;
+String RELAY3_STATE_TOPIC;
+String TEMPERATURE_TOPIC;
+String HUMIDITY_TOPIC;
+String SENSOR_DATA_TOPIC;
+String ISOLATE_IN1_STATE_TOPIC;
+String ISOLATE_IN2_STATE_TOPIC;
 
 // ===== Global Objects =====
 WiFiClient espClient;
@@ -117,7 +121,32 @@ void setup() {
   // Initialize Serial Monitor
   Serial.begin(115200);
   Serial.println("\n=== ESP32 MQTT LED Controller Starting ===");
-  
+
+  // --- Set Device ID from custom DEVICE_NAME define ---
+  // To deploy a new board: change #define DEVICE_NAME above and re-flash
+  DEVICE_ID = String(DEVICE_NAME);
+  MQTT_CLIENT_ID = String("ThaiTechZone_") + DEVICE_ID;
+
+  // --- Build MQTT Topics using Device ID ---
+  // Format: thaitechzone/v2/<device_id>/<direction>/<property>
+  String base = String("thaitechzone/v2/") + DEVICE_ID;
+  LED_CONTROL_TOPIC       = base + "/control/led";
+  LED_STATE_TOPIC         = base + "/state/led";
+  RELAY1_CONTROL_TOPIC    = base + "/control/relay1";
+  RELAY2_CONTROL_TOPIC    = base + "/control/relay2";
+  RELAY3_CONTROL_TOPIC    = base + "/control/relay3";
+  RELAY1_STATE_TOPIC      = base + "/state/relay1";
+  RELAY2_STATE_TOPIC      = base + "/state/relay2";
+  RELAY3_STATE_TOPIC      = base + "/state/relay3";
+  TEMPERATURE_TOPIC       = base + "/sensor/temperature";
+  HUMIDITY_TOPIC          = base + "/sensor/humidity";
+  SENSOR_DATA_TOPIC       = base + "/sensor/data";
+  ISOLATE_IN1_STATE_TOPIC = base + "/state/isolate_in1";
+  ISOLATE_IN2_STATE_TOPIC = base + "/state/isolate_in2";
+
+  Serial.print("Device ID  : "); Serial.println(DEVICE_ID);
+  Serial.print("Base Topic : "); Serial.println(base);
+
   // Configure LED pin
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW); // Start with LED OFF
@@ -254,7 +283,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
   Serial.println(message);
 
   // Check if message is for LED control
-  if (String(topic) == LED_CONTROL_TOPIC) {
+  if (String(topic) == LED_CONTROL_TOPIC.c_str()) {
     if (message == "ON") {
       digitalWrite(LED_PIN, HIGH);
       Serial.println("LED turned ON");
@@ -270,7 +299,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
     publishLedState();
   }
   // Check if message is for Relay 1 control
-  else if (String(topic) == RELAY1_CONTROL_TOPIC) {
+  else if (String(topic) == RELAY1_CONTROL_TOPIC.c_str()) {
     if (message == "ON") {
       digitalWrite(RELAY1_PIN, LOW); // Active Low: LOW = ON
       Serial.println("Relay 1 turned ON");
@@ -284,7 +313,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
     publishRelayState(1);
   }
   // Check if message is for Relay 2 control
-  else if (String(topic) == RELAY2_CONTROL_TOPIC) {
+  else if (String(topic) == RELAY2_CONTROL_TOPIC.c_str()) {
     if (message == "ON") {
       digitalWrite(RELAY2_PIN, LOW); // Active Low: LOW = ON
       Serial.println("Relay 2 turned ON");
@@ -298,7 +327,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
     publishRelayState(2);
   }
   // Check if message is for Relay 3 control
-  else if (String(topic) == RELAY3_CONTROL_TOPIC) {
+  else if (String(topic) == RELAY3_CONTROL_TOPIC.c_str()) {
     if (message == "ON") {
       digitalWrite(RELAY3_PIN, LOW); // Active Low: LOW = ON
       Serial.println("Relay 3 turned ON");
@@ -319,7 +348,7 @@ void publishLedState() {
   String stateMessage = ledState ? "ON" : "OFF";
   
   // Publish with retain flag
-  if (mqttClient.publish(LED_STATE_TOPIC, stateMessage.c_str(), true)) {
+  if (mqttClient.publish(LED_STATE_TOPIC.c_str(), stateMessage.c_str(), true)) {
     Serial.print("State published: ");
     Serial.println(stateMessage);
   } else {
@@ -329,7 +358,7 @@ void publishLedState() {
 
 void publishRelayState(int relayNum) {
   bool relayState;
-  const char* stateTopic;
+  String stateTopic;
   
   // Get relay state and topic based on relay number
   switch(relayNum) {
@@ -354,7 +383,7 @@ void publishRelayState(int relayNum) {
   String stateMessage = relayState ? "OFF" : "ON";
   
   // Publish with retain flag
-  if (mqttClient.publish(stateTopic, stateMessage.c_str(), true)) {
+  if (mqttClient.publish(stateTopic.c_str(), stateMessage.c_str(), true)) {
     Serial.print("Relay ");
     Serial.print(relayNum);
     Serial.print(" state published: ");
@@ -368,37 +397,35 @@ void publishRelayState(int relayNum) {
 
 void reconnectMQTT() {
   Serial.print("Attempting MQTT connection...");
-  
-  // Create a random client ID to avoid conflicts
-  String clientId = MQTT_CLIENT_ID;
-  clientId += String(random(0xffff), HEX);
-  
+
+  // Append random suffix to avoid session conflicts on reconnect
+  String clientId = MQTT_CLIENT_ID + "_" + String(random(0xffff), HEX);
   if (mqttClient.connect(clientId.c_str())) {
     Serial.println(" connected!");
     
     // Subscribe to control topics
-    if (mqttClient.subscribe(LED_CONTROL_TOPIC)) {
+    if (mqttClient.subscribe(LED_CONTROL_TOPIC.c_str())) {
       Serial.print("Subscribed to: ");
       Serial.println(LED_CONTROL_TOPIC);
     } else {
       Serial.println("Failed to subscribe to LED control topic");
     }
     
-    if (mqttClient.subscribe(RELAY1_CONTROL_TOPIC)) {
+    if (mqttClient.subscribe(RELAY1_CONTROL_TOPIC.c_str())) {
       Serial.print("Subscribed to: ");
       Serial.println(RELAY1_CONTROL_TOPIC);
     } else {
       Serial.println("Failed to subscribe to Relay 1 control topic");
     }
     
-    if (mqttClient.subscribe(RELAY2_CONTROL_TOPIC)) {
+    if (mqttClient.subscribe(RELAY2_CONTROL_TOPIC.c_str())) {
       Serial.print("Subscribed to: ");
       Serial.println(RELAY2_CONTROL_TOPIC);
     } else {
       Serial.println("Failed to subscribe to Relay 2 control topic");
     }
     
-    if (mqttClient.subscribe(RELAY3_CONTROL_TOPIC)) {
+    if (mqttClient.subscribe(RELAY3_CONTROL_TOPIC.c_str())) {
       Serial.print("Subscribed to: ");
       Serial.println(RELAY3_CONTROL_TOPIC);
     } else {
@@ -452,13 +479,13 @@ void readAndPublishSensorData() {
   String tempStr = String(temperature, 1);
   String humStr = String(humidity, 1);
   
-  if (mqttClient.publish(TEMPERATURE_TOPIC, tempStr.c_str())) {
+  if (mqttClient.publish(TEMPERATURE_TOPIC.c_str(), tempStr.c_str())) {
     Serial.println("Temperature published successfully");
   } else {
     Serial.println("Failed to publish temperature");
   }
   
-  if (mqttClient.publish(HUMIDITY_TOPIC, humStr.c_str())) {
+  if (mqttClient.publish(HUMIDITY_TOPIC.c_str(), humStr.c_str())) {
     Serial.println("Humidity published successfully");
   } else {
     Serial.println("Failed to publish humidity");
@@ -478,7 +505,7 @@ void publishSensorDataJSON(float temperature, float humidity) {
   String jsonString;
   serializeJson(doc, jsonString);
   
-  if (mqttClient.publish(SENSOR_DATA_TOPIC, jsonString.c_str())) {
+  if (mqttClient.publish(SENSOR_DATA_TOPIC.c_str(), jsonString.c_str())) {
     Serial.print("Sensor data JSON published: ");
     Serial.println(jsonString);
   } else {
@@ -670,7 +697,7 @@ void checkIsolatedInputs() {
 
 void publishIsolatedInputState(int inputNum) {
   bool inputState;
-  const char* stateTopic;
+  String stateTopic;
   
   // Get input state and topic based on input number
   switch(inputNum) {
@@ -691,7 +718,7 @@ void publishIsolatedInputState(int inputNum) {
   String stateMessage = inputState == LOW ? "ON" : "OFF";
   
   // Publish with retain flag
-  if (mqttClient.publish(stateTopic, stateMessage.c_str(), true)) {
+  if (mqttClient.publish(stateTopic.c_str(), stateMessage.c_str(), true)) {
     Serial.print("Isolated Input ");
     Serial.print(inputNum);
     Serial.print(" state published: ");
