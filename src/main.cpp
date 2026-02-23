@@ -14,9 +14,14 @@
 #include "DevPZEM.h"         // PZEM-016 AC Power Monitor (Modbus RTU)
 #include "DevTempHumidity.h" // XY-MD03 Temp/Humidity Sensor (Modbus RTU)
 
+// ===== DS18B20 Temperature Sensor =====
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
 // ===== Pin Definitions =====
 #define LED_PIN 2 // The onboard LED is on GPIO2 (Active High)
 #define DHT_PIN 15 // DHT sensor pin (GPIO15)
+#define DS18B20_PIN 14 // DS18B20 temperature sensor (GPIO14, 1-Wire)
 #define DHT_TYPE DHT22 // DHT22 (AM2302)
 #define RELAY1_PIN 17 // Relay 1 pin (GPIO17)
 #define RELAY2_PIN 16 // Relay 2 pin (GPIO16)
@@ -73,6 +78,7 @@ String HUMIDITY_TOPIC;
 String SENSOR_DATA_TOPIC;
 String ISOLATE_IN1_STATE_TOPIC;
 String ISOLATE_IN2_STATE_TOPIC;
+String DS18B20_TOPIC;
 
 // ===== Global Objects =====
 WiFiClient espClient;
@@ -80,17 +86,24 @@ PubSubClient mqttClient(espClient);
 DHT dht(DHT_PIN, DHT_TYPE);
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
+// DS18B20 objects
+OneWire oneWire(DS18B20_PIN);
+DallasTemperature ds18b20(&oneWire);
+
 long last_reconnect_attempt = 0;
 unsigned long lastSensorRead = 0;
+unsigned long lastDS18B20Read = 0;
 unsigned long lastDisplayUpdate = 0;
 unsigned long lastIsolatedInputPublish = 0;
 const unsigned long SENSOR_INTERVAL = 5000; // Send sensor data every 5 seconds
+const unsigned long DS18B20_INTERVAL = 5000; // Read DS18B20 every 5 seconds
 const unsigned long DISPLAY_UPDATE_INTERVAL = 500; // Update display every 500ms
 const unsigned long ISOLATED_INPUT_PUBLISH_INTERVAL = 2000; // Publish isolated input states every 2 seconds
 
 // Store current sensor values for display
 float currentTemperature = 0.0;
 float currentHumidity = 0.0;
+float currentDS18B20Temp = 0.0; // DS18B20 real temperature for display
 
 // OLED Display availability flag
 bool oledAvailable = false;
@@ -117,6 +130,7 @@ void reconnectMQTT();
 void publishLedState();
 void publishRelayState(int relayNum);
 void readAndPublishSensorData();
+void readAndPublishDS18B20();
 void publishSensorDataJSON(float temperature, float humidity);
 void updateDisplay();
 void checkButtons();
@@ -150,6 +164,7 @@ void setup() {
   SENSOR_DATA_TOPIC       = base + "/sensor/data";
   ISOLATE_IN1_STATE_TOPIC = base + "/state/isolate_in1";
   ISOLATE_IN2_STATE_TOPIC = base + "/state/isolate_in2";
+  DS18B20_TOPIC           = base + "/sensor/ds18b20";
 
   Serial.print("Device ID  : "); Serial.println(DEVICE_ID);
   Serial.print("Base Topic : "); Serial.println(base);
@@ -203,6 +218,15 @@ void setup() {
   // Initialize DHT sensor
   dht.begin();
   Serial.println("DHT sensor initialized");
+
+  // Initialize DS18B20 sensor
+  ds18b20.begin();
+  int ds18b20Count = ds18b20.getDeviceCount();
+  Serial.print("DS18B20 sensors found: ");
+  Serial.println(ds18b20Count);
+  if (ds18b20Count == 0) {
+    Serial.println("WARNING: No DS18B20 sensor found on GPIO13");
+  }
   
   // Connect to WiFi
   setup_wifi();
@@ -237,6 +261,12 @@ void loop() {
     if (now - lastSensorRead >= SENSOR_INTERVAL) {
       lastSensorRead = now;
       readAndPublishSensorData();
+    }
+
+    // Read and publish DS18B20 temperature periodically
+    if (now - lastDS18B20Read >= DS18B20_INTERVAL) {
+      lastDS18B20Read = now;
+      readAndPublishDS18B20();
     }
     
     // Publish isolated input states periodically
@@ -455,59 +485,71 @@ void reconnectMQTT() {
 }
 
 void readAndPublishSensorData() {
-  // For now, generate random values
-  // Later you can replace this with actual DHT sensor readings
+  // Random values (placeholder — replace with real sensor when ready)
   float temperature = random(200, 350) / 10.0; // Random temp between 20.0-35.0°C
   float humidity = random(400, 800) / 10.0;    // Random humidity between 40.0-80.0%
-  
-  // Uncomment these lines when you have a real DHT sensor connected
-  /*
-  float temperature = dht.readTemperature();
-  float humidity = dht.readHumidity();
-  
-  // Check if any reads failed and return early (to try again)
-  if (isnan(temperature) || isnan(humidity)) {
-    Serial.println("Failed to read from DHT sensor!");
-    return;
-  }
-  */
-  
+
   // Store values for display
   currentTemperature = temperature;
   currentHumidity = humidity;
-  
+
   Serial.print("Temperature: ");
-  Serial.print(temperature);
+  Serial.print(temperature, 1);
   Serial.print("°C, Humidity: ");
-  Serial.print(humidity);
+  Serial.print(humidity, 1);
   Serial.println("%");
-  
+
   // Publish individual topics
   String tempStr = String(temperature, 1);
   String humStr = String(humidity, 1);
-  
+
   if (mqttClient.publish(TEMPERATURE_TOPIC.c_str(), tempStr.c_str())) {
     Serial.println("Temperature published successfully");
   } else {
     Serial.println("Failed to publish temperature");
   }
-  
+
   if (mqttClient.publish(HUMIDITY_TOPIC.c_str(), humStr.c_str())) {
     Serial.println("Humidity published successfully");
   } else {
     Serial.println("Failed to publish humidity");
   }
-  
+
   // Also publish as JSON format
   publishSensorDataJSON(temperature, humidity);
+}
+
+void readAndPublishDS18B20() {
+  // Read real DS18B20 temperature sensor (1-Wire on GPIO13)
+  ds18b20.requestTemperatures();
+  float temp = ds18b20.getTempCByIndex(0);
+
+  // DEVICE_DISCONNECTED_C = -127.0 — fallback to 0.0 if not connected
+  if (temp == DEVICE_DISCONNECTED_C || temp < -100.0) {
+    temp = 0.0;
+    Serial.println("DS18B20: Not connected or read failed — publishing 0.0");
+  } else {
+    Serial.print("DS18B20: ");
+    Serial.print(temp, 1);
+    Serial.println(" °C");
+  }
+
+  currentDS18B20Temp = temp; // Store for OLED display
+
+  String tempStr = String(temp, 1);
+  if (mqttClient.publish(DS18B20_TOPIC.c_str(), tempStr.c_str(), true)) {
+    Serial.println("DS18B20 topic published");
+  } else {
+    Serial.println("Failed to publish DS18B20 topic");
+  }
 }
 
 void publishSensorDataJSON(float temperature, float humidity) {
   // Create JSON payload in the exact format requested
   StaticJsonDocument<200> doc;
-  doc["temperature"] = round(temperature * 10) / 10.0; // Round to 1 decimal place
-  doc["humidity"] = round(humidity * 10) / 10.0;       // Round to 1 decimal place
-  doc["device_name"] = "ESP_01";
+  doc["temperature"] = round(temperature * 10) / 10.0; // DS18B20 temperature
+  doc["humidity"] = round(humidity * 10) / 10.0;       // DHT22 humidity
+  doc["device_name"] = DEVICE_ID;                      // Use dynamic device ID
   
   String jsonString;
   serializeJson(doc, jsonString);
@@ -534,15 +576,18 @@ void updateDisplay() {
   display.println(F("ESP32 IoT Control"));
   display.drawLine(0, 10, 128, 10, SSD1306_WHITE);
   
-  // WiFi Status
+  // DS18B20 Temperature (replaces WiFi RSSI line)
   display.setCursor(0, 14);
-  if (WiFi.status() == WL_CONNECTED) {
-    display.print(F("WiFi: OK "));
-    display.print(WiFi.RSSI());
-    display.println(F("dBm"));
+  display.print(F("DS18B20:"));
+  if (currentDS18B20Temp == 0.0) {
+    display.print(F("--.-"));
   } else {
-    display.println(F("WiFi: Disconnected"));
+    display.print(currentDS18B20Temp, 1);
   }
+  display.print(F("C "));
+  // WiFi status indicator (compact)
+  display.print(WiFi.status() == WL_CONNECTED ? F("W:OK") : F("W:--"));
+  display.println();
   
   // MQTT Status
   display.setCursor(0, 24);
