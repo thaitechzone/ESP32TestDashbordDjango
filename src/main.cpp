@@ -7,6 +7,13 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
+// ===== Device Class Headers =====
+#include "DevRelay.h"        // Relay controller (Active Low/High)
+#include "DevSwitch.h"       // Button with debounce, click, long-press
+#include "DevIsoInput.h"     // Isolated Digital Input with debounce
+#include "DevPZEM.h"         // PZEM-016 AC Power Monitor (Modbus RTU)
+#include "DevTempHumidity.h" // XY-MD03 Temp/Humidity Sensor (Modbus RTU)
+
 // ===== Pin Definitions =====
 #define LED_PIN 2 // The onboard LED is on GPIO2 (Active High)
 #define DHT_PIN 15 // DHT sensor pin (GPIO15)
