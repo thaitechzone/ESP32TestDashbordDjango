@@ -46,8 +46,8 @@
 // IMPORTANT: Replace with your actual WiFi credentials
 // const char* WIFI_SSID = "myHome_2.4GHz";
 // const char* WIFI_PASSWORD = "0939391546";
-const char* WIFI_SSID = "myHome_2.4GHz";
-const char* WIFI_PASSWORD = "0939391546";
+const char* WIFI_SSID = "MEZZO MUSIC SCHOOL_2.4G";
+const char* WIFI_PASSWORD = "mezzo123";
 
 // ===== MQTT Configuration =====
 const char* MQTT_BROKER = "broker.hivemq.com";
