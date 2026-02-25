@@ -112,6 +112,10 @@ float currentDS18B20Temp = 0.0; // DS18B20 real temperature for display
 // OLED Display availability flag
 bool oledAvailable = false;
 
+// Simulation flags — true when sensor is disconnected and random values are used
+bool ds18b20Simulated = false;
+bool xyMD03Simulated  = false;
+
 // Button states
 bool lastSW1State = HIGH;
 bool lastSW2State = HIGH;
@@ -234,8 +238,11 @@ void setup() {
   Serial.print("DS18B20 sensors found: ");
   Serial.println(ds18b20Count);
   if (ds18b20Count == 0) {
-    Serial.println("WARNING: No DS18B20 sensor found on GPIO13");
+    Serial.println("WARNING: No DS18B20 sensor found on GPIO14 — will use simulated values");
   }
+
+  // Seed random number generator for sensor simulation
+  randomSeed(esp_random());
   
   // Connect to WiFi
   setup_wifi();
@@ -497,17 +504,25 @@ void readAndPublishSensorData() {
   // Read real values from XY-MD03 Temp/Humidity Sensor (Modbus RTU)
   bool readOK = xyMD03.update();
 
-  float temperature = readOK ? xyMD03.getTemperature() : 0.0;
-  float humidity    = readOK ? xyMD03.getHumidity()    : 0.0;
-
+  float temperature, humidity;
   if (readOK) {
+    temperature = xyMD03.getTemperature();
+    humidity    = xyMD03.getHumidity();
+    xyMD03Simulated = false;
     Serial.print("[XY-MD03] Temperature: ");
     Serial.print(temperature, 1);
     Serial.print(" °C, Humidity: ");
     Serial.print(humidity, 1);
     Serial.println(" %");
   } else {
-    Serial.println("[XY-MD03] Read failed — publishing 0.0");
+    // XY-MD03 not connected — generate random simulated values
+    temperature = random(200, 401) / 10.0f;  // 20.0 – 40.0 °C
+    humidity    = random(400, 901) / 10.0f;  // 40.0 – 90.0 %
+    xyMD03Simulated = true;
+    Serial.print("[XY-MD03] Not connected — simulated T:");
+    Serial.print(temperature, 1);
+    Serial.print(" H:");
+    Serial.println(humidity, 1);
   }
 
   // Store values for display
@@ -539,11 +554,15 @@ void readAndPublishDS18B20() {
   ds18b20.requestTemperatures();
   float temp = ds18b20.getTempCByIndex(0);
 
-  // DEVICE_DISCONNECTED_C = -127.0 — fallback to 0.0 if not connected
+  // DEVICE_DISCONNECTED_C = -127.0 — generate random simulated value if not connected
   if (temp == DEVICE_DISCONNECTED_C || temp < -100.0) {
-    temp = 0.0;
-    Serial.println("DS18B20: Not connected or read failed — publishing 0.0");
+    temp = random(200, 401) / 10.0f;  // 20.0 – 40.0 °C
+    ds18b20Simulated = true;
+    Serial.print("DS18B20: Not connected — simulated: ");
+    Serial.print(temp, 1);
+    Serial.println(" °C");
   } else {
+    ds18b20Simulated = false;
     Serial.print("DS18B20: ");
     Serial.print(temp, 1);
     Serial.println(" °C");
@@ -585,10 +604,14 @@ void updateDisplay() {
   
   display.clearDisplay();
   
-  // Header
+  // Header — show [SIM] when any sensor is using simulated values
   display.setTextSize(1);
   display.setCursor(0, 0);
-  display.println(F("ESP32 IoT Control"));
+  if (ds18b20Simulated || xyMD03Simulated) {
+    display.println(F("ESP32 IoT   [SIM]"));
+  } else {
+    display.println(F("ESP32 IoT Control"));
+  }
   display.drawLine(0, 10, 128, 10, SSD1306_WHITE);
   
   // DS18B20 Temperature (replaces WiFi RSSI line)
@@ -604,13 +627,10 @@ void updateDisplay() {
   display.print(WiFi.status() == WL_CONNECTED ? F("W:OK") : F("W:--"));
   display.println();
   
-  // MQTT Status
+  // Device Name
   display.setCursor(0, 24);
-  if (mqttClient.connected()) {
-    display.println(F("MQTT: Connected"));
-  } else {
-    display.println(F("MQTT: Disconnected"));
-  }
+  display.print(F("ID:"));
+  display.println(DEVICE_ID);
   
   display.drawLine(0, 34, 128, 34, SSD1306_WHITE);
   
