@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include <WiFiManager.h>
 #include <PubSubClient.h>
 #include <DHT.h>
 #include <ArduinoJson.h>
@@ -43,11 +44,8 @@
 #define SCREEN_ADDRESS 0x3C
 
 // ===== WiFi Configuration =====
-// IMPORTANT: Replace with your actual WiFi credentials
-// const char* WIFI_SSID = "myHome_2.4GHz";
-// const char* WIFI_PASSWORD = "0939391546";
-const char* WIFI_SSID = "BC_2.4G";
-const char* WIFI_PASSWORD = "0890858286";
+// WiFi credentials are managed by WiFiManager (stored in NVS flash).
+// To reconfigure: hold SW1 for 5 seconds during startup to clear saved credentials.
 
 // ===== MQTT Configuration =====
 const char* MQTT_BROKER = "broker.hivemq.com";
@@ -132,6 +130,7 @@ unsigned long lastIsolateIn1DebounceTime = 0;
 unsigned long lastIsolateIn2DebounceTime = 0;
 
 // ===== Function Declarations =====
+void checkWifiResetButton();
 void setup_wifi();
 void callback(char* topic, byte* payload, unsigned int length);
 void reconnectMQTT();
@@ -243,8 +242,11 @@ void setup() {
 
   // Seed random number generator for sensor simulation
   randomSeed(esp_random());
-  
-  // Connect to WiFi
+
+  // Check if SW1 is held at startup — 5-second countdown to reset WiFi credentials
+  checkWifiResetButton();
+
+  // Connect to WiFi (via WiFiManager — uses saved credentials or opens config portal)
   setup_wifi();
   
   // Configure MQTT client
@@ -300,26 +302,145 @@ void loop() {
   }
 }
 
-void setup_wifi() {
-  delay(10);
-  Serial.println();
-  Serial.print("Connecting to WiFi: ");
-  Serial.println(WIFI_SSID);
+// ─── WiFi Reset Button (SW1 hold 5s during startup) ───────────────────────────
+void checkWifiResetButton() {
+  const unsigned long RESET_HOLD_MS = 5000;
+  const unsigned long TICK_MS       = 100;
 
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
+  // SW1 is Active Low — LOW means pressed
+  if (digitalRead(SW1_PIN) != LOW) {
+    return; // Not held, skip
   }
 
-  Serial.println();
-  Serial.println("WiFi connected successfully!");
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
-  Serial.print("Signal strength (RSSI): ");
-  Serial.print(WiFi.RSSI());
-  Serial.println(" dBm");
+  Serial.println("[WiFi] SW1 held at startup — reset countdown started");
+  unsigned long pressStart = millis();
+  int lastShown = -1;
+
+  while (digitalRead(SW1_PIN) == LOW) {
+    unsigned long elapsed = millis() - pressStart;
+
+    if (elapsed >= RESET_HOLD_MS) {
+      // ── 5 seconds reached: clear credentials ──
+      Serial.println("[WiFi] Credentials cleared! Starting config portal...");
+      if (oledAvailable) {
+        display.clearDisplay();
+        display.setTextSize(1);
+        display.setCursor(0, 0);
+        display.println(F("WiFi Credentials"));
+        display.println(F("CLEARED!"));
+        display.setCursor(0, 36);
+        display.println(F("Starting config"));
+        display.println(F("portal..."));
+        display.display();
+      }
+      delay(1500);
+      WiFiManager wm;
+      wm.resetSettings(); // Erase saved SSID/Password from NVS
+      return;             // setup_wifi() will open the portal
+    }
+
+    // ── Countdown display ──
+    int remaining = (int)((RESET_HOLD_MS - elapsed) / 1000) + 1;
+    if (remaining != lastShown) {
+      lastShown = remaining;
+      Serial.printf("[WiFi] Reset in %d s...\n", remaining);
+      if (oledAvailable) {
+        display.clearDisplay();
+        display.setTextSize(1);
+        display.setCursor(0, 0);
+        display.println(F("Hold SW1 to Reset"));
+        display.println(F("WiFi Settings"));
+        // Big countdown number (centered)
+        display.setTextSize(4);
+        display.setCursor(52, 16);
+        display.println(remaining);
+        display.setTextSize(1);
+        display.setCursor(0, 56);
+        display.println(F("Release to cancel"));
+        display.display();
+      }
+    }
+    delay(TICK_MS);
+  }
+
+  // Button released before 5 seconds — cancelled
+  Serial.println("[WiFi] SW1 released early — reset cancelled");
+  if (oledAvailable) {
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setCursor(0, 0);
+    display.println(F("Reset Cancelled"));
+    display.display();
+    delay(1000);
+  }
+}
+
+// Called by WiFiManager when it opens the config portal AP
+void wifiManagerAPCallback(WiFiManager* wm) {
+  String apSSID = wm->getConfigPortalSSID();
+  Serial.println("[WiFi] Config portal AP: " + apSSID);
+  Serial.println("[WiFi] Connect to AP, then open http://192.168.4.1");
+  if (oledAvailable) {
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setCursor(0, 0);
+    display.println(F("-- WiFi Config --"));
+    display.setCursor(0, 12);
+    display.println(F("Connect to AP:"));
+    display.setCursor(0, 22);
+    display.println(apSSID.c_str());
+    display.drawLine(0, 33, 128, 33, SSD1306_WHITE);
+    display.setCursor(0, 37);
+    display.println(F("Then open browser:"));
+    display.setCursor(0, 47);
+    display.println(F("192.168.4.1"));
+    display.display();
+  }
+}
+
+void setup_wifi() {
+  WiFiManager wm;
+  wm.setConfigPortalTimeout(180); // Portal auto-closes after 3 minutes
+  wm.setAPCallback(wifiManagerAPCallback);
+
+  if (oledAvailable) {
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setCursor(0, 0);
+    display.println(F("Connecting WiFi..."));
+    display.display();
+  }
+
+  // autoConnect: tries saved credentials first, opens portal AP if not found
+  String apName = String("ESP32-") + DEVICE_ID;
+  if (!wm.autoConnect(apName.c_str())) {
+    Serial.println("[WiFi] Connection failed / portal timed out — restarting");
+    if (oledAvailable) {
+      display.clearDisplay();
+      display.setTextSize(1);
+      display.setCursor(0, 0);
+      display.println(F("WiFi Failed!"));
+      display.println(F("Restarting..."));
+      display.display();
+    }
+    delay(3000);
+    ESP.restart();
+  }
+
+  Serial.println("[WiFi] Connected!");
+  Serial.print("[WiFi] IP: "); Serial.println(WiFi.localIP());
+  Serial.print("[WiFi] RSSI: "); Serial.print(WiFi.RSSI()); Serial.println(" dBm");
+
+  if (oledAvailable) {
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setCursor(0, 0);
+    display.println(F("WiFi Connected!"));
+    display.setCursor(0, 12);
+    display.println(WiFi.localIP().toString().c_str());
+    display.display();
+    delay(2000);
+  }
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
